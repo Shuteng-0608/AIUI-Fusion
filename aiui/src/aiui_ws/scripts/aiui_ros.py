@@ -7,6 +7,7 @@ from socket import *
 import signal
 from processStrategy import AiuiMessageProcess, ConfirmProcess
 from threading import Thread, Event
+import threading
 import subprocess
 from sr_modbus_sdk import SRModbusSdk
 import rospy
@@ -14,6 +15,7 @@ from aiui.srv import TTS, TTSRequest, TTSResponse
 from aiui.srv import VLMProcess, VLMProcessRequest, VLMProcessResponse
 from aiui.srv import StringService, StringServiceRequest, StringServiceResponse
 from aiui.srv import DH5SetPosition, DH5SetPositionRequest, DH5SetPositionResponse
+from aiui.srv import VLAProcess, VLAProcessRequest, VLAProcessResponse
 from std_msgs.msg import String
 import cv2
 from cv_bridge import CvBridge
@@ -73,7 +75,8 @@ class SocketDemo(Thread):
         self.seen_status_0 = False  # 标记是否见过状态0
         self.vlm_state = False  # VLM状态标志
         self.vlm_text = ""  # VLM文本
-
+        self.vla_text = ""
+        self.audio_thread = None  # 用于播放音频的线程
 
 
     def connect(self):
@@ -180,6 +183,69 @@ class SocketDemo(Thread):
             mb_server.move_to_station_no(i, 1)
             mb_server.wait_movement_task_finish(1) 
 
+    def thake_photo(self):
+        bridge = CvBridge()
+    
+        try:
+            rospy.sleep(0.8)
+            self.play_audio("/home/whc/aiui_ws/src/aiui/audio/look_at_me.mp3")
+            # rospy.sleep(2)
+            self.play_audio("/home/whc/aiui_ws/src/aiui/audio/get_ready.mp3")
+            # rospy.sleep(2)
+            self.play_audio("/home/whc/aiui_ws/src/aiui/audio/pose.mp3")
+            # rospy.sleep(2)
+            self.play_audio("/home/whc/aiui_ws/src/aiui/audio/three.mp3")
+            rospy.sleep(1.5)
+            self.play_audio("/home/whc/aiui_ws/src/aiui/audio/two.mp3")
+            rospy.sleep(1.5)
+            self.play_audio("/home/whc/aiui_ws/src/aiui/audio/one.mp3")
+            rospy.sleep(2.5)
+            self.play_audio("/home/whc/aiui_ws/src/aiui/audio/qie_zi.mp3")
+            # rospy.sleep(2)
+
+            
+            # 等待并获取ROS图像消息
+            rospy.loginfo("等待相机图像消息...")
+            image_msg = rospy.wait_for_message("/camera/color/image_raw", Image, timeout=5.0)
+            
+            # 将ROS图像消息转换为OpenCV格式
+            cv_image = bridge.imgmsg_to_cv2(image_msg, "bgr8")
+            rospy.loginfo("成功获取图像!")
+            
+            # 保存图像
+            cv2.imwrite("captured_image.jpg", cv_image)
+            rospy.loginfo("图像已保存为 captured_image.jpg")
+            
+            # 创建全屏窗口显示图像
+            screen_width, screen_height = 1920, 1080  # 根据实际屏幕分辨率调整
+            window_name = "Fullscreen Image"
+            cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
+            cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            
+            # 调整图像尺寸以适应屏幕（保持宽高比）
+            h, w = cv_image.shape[:2]
+            scale = min(screen_width/w, screen_height/h)
+            resized_image = cv2.resize(cv_image, (int(w*scale), int(h*scale)))
+            
+            # 创建黑色背景并在中央显示图像
+            display_image = np.zeros((screen_height, screen_width, 3), dtype=np.uint8)
+            x_offset = (screen_width - resized_image.shape[1]) // 2
+            y_offset = (screen_height - resized_image.shape[0]) // 2
+            display_image[y_offset:y_offset+resized_image.shape[0], 
+                        x_offset:x_offset+resized_image.shape[1]] = resized_image
+            
+            # 显示图像
+            cv2.imshow(window_name, display_image)
+            rospy.loginfo("按任意键退出全屏显示...")
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+            
+        except rospy.ROSException:
+            rospy.logerr("等待图像消息超时，请检查相机是否已启动")
+        except Exception as e:
+            rospy.logerr(f"发生错误: {str(e)}")
+
+
 
     def handle_detected_intent(self, intent):
         if intent == "SayHi":
@@ -232,6 +298,25 @@ class SocketDemo(Thread):
         #     self.arm_client.wait_for_service()
         #     # self.arm_client.call(req)
         #     Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
+        
+        elif intent == "vla":
+            self.vlm_state = True
+            rospy.loginfo(f"检测到 [{intent}] 意图, 执行视觉语言动作")
+            tts_req = TTSRequest()
+            tts_req.request = "好的，很高兴可以帮到你"
+            self.tts_client.wait_for_service()
+            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+
+            # client = rospy.ServiceProxy("tts_service",TTS)
+            # client.wait_for_service()
+            # client.call(tts_req)
+            # client.close()
+
+            vla_req = VLAProcess()
+            vla_req.request = self.vla_text
+            self.arm_client.wait_for_service()
+            Thread(target=self.arm_client.call, args=(vla_req,), daemon=True).start()
+        
         elif intent == "vlm":
             self.vlm_state = True
             self.tts_text = "好的，让我仔细看一下"
@@ -267,6 +352,18 @@ class SocketDemo(Thread):
             self.arm_client.wait_for_service()
             Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
 
+        elif intent == "pangu":
+            self.vlm_state = True
+            rospy.loginfo(f"检测到 [{intent}] 意图, 讲述盘古开天地的故事")
+            tts_req = TTSRequest()
+            tts_req.request = "好的, 盘古是中国古代传说时期中开天辟地的神。在天地还没有开辟以前，宇宙混沌一团，盘古凭借着自己的神力把天地开辟出来了。他的左眼变成了太阳，右眼变成了月亮；头发和胡须变成了夜空的星星；他的身体变成了东、西、南、北四极和雄伟的三山五岳；血液变成了江河；牙齿、骨骼和骨髓变成了地下矿藏；皮肤和汗毛变成了大地上的草木；汗水变成了雨露"
+            self.tts_client.wait_for_service()
+            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # self.play_audio("/home/whc/aiui_ws/src/aiui/audio/pangu.mp3")
+            # audio_thread = threading.Thread(target=self.play_audio, args=("/home/whc/aiui_ws/pangu.mp3",), daemon=True)
+            # self.audio_thread = Thread(target=self.play_audio, args=("/home/whc/aiui_ws/pangu.mp3",), daemon=True)
+            # self.audio_thread.start()
+            
         elif intent == "take_photo":
             self.vlm_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行拍照动作")
@@ -278,72 +375,11 @@ class SocketDemo(Thread):
             arm_req.request = '7'
             self.arm_client.wait_for_service()
             Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
+            
+            self.thake_photo()
+            # Thread(target=self.play_audio, args=("/home/whc/aiui_ws/src/aiui/audio/take_photo.mp3",), daemon=True).start()
 
-            bridge = CvBridge()
-    
-            try:
-                rospy.sleep(0.8)
-                self.play_audio("/home/whc/aiui_ws/src/aiui/audio/look_at_me.mp3")
-                # rospy.sleep(2)
-                self.play_audio("/home/whc/aiui_ws/src/aiui/audio/get_ready.mp3")
-                # rospy.sleep(2)
-                self.play_audio("/home/whc/aiui_ws/src/aiui/audio/pose.mp3")
-                # rospy.sleep(2)
-                self.play_audio("/home/whc/aiui_ws/src/aiui/audio/three.mp3")
-                rospy.sleep(1.5)
-                self.play_audio("/home/whc/aiui_ws/src/aiui/audio/two.mp3")
-                rospy.sleep(1.5)
-                self.play_audio("/home/whc/aiui_ws/src/aiui/audio/one.mp3")
-                rospy.sleep(2.5)
-                self.play_audio("/home/whc/aiui_ws/src/aiui/audio/qie_zi.mp3")
-                # rospy.sleep(2)
-
-                
-                
-                
-                
-                
-                
-                # 等待并获取ROS图像消息
-                rospy.loginfo("等待相机图像消息...")
-                image_msg = rospy.wait_for_message("/camera/color/image_raw", Image, timeout=5.0)
-                
-                # 将ROS图像消息转换为OpenCV格式
-                cv_image = bridge.imgmsg_to_cv2(image_msg, "bgr8")
-                rospy.loginfo("成功获取图像!")
-                
-                # 保存图像
-                cv2.imwrite("captured_image.jpg", cv_image)
-                rospy.loginfo("图像已保存为 captured_image.jpg")
-                
-                # 创建全屏窗口显示图像
-                screen_width, screen_height = 1920, 1080  # 根据实际屏幕分辨率调整
-                window_name = "Fullscreen Image"
-                cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
-                cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-                
-                # 调整图像尺寸以适应屏幕（保持宽高比）
-                h, w = cv_image.shape[:2]
-                scale = min(screen_width/w, screen_height/h)
-                resized_image = cv2.resize(cv_image, (int(w*scale), int(h*scale)))
-                
-                # 创建黑色背景并在中央显示图像
-                display_image = np.zeros((screen_height, screen_width, 3), dtype=np.uint8)
-                x_offset = (screen_width - resized_image.shape[1]) // 2
-                y_offset = (screen_height - resized_image.shape[0]) // 2
-                display_image[y_offset:y_offset+resized_image.shape[0], 
-                            x_offset:x_offset+resized_image.shape[1]] = resized_image
-                
-                # 显示图像
-                cv2.imshow(window_name, display_image)
-                rospy.loginfo("按任意键退出全屏显示...")
-                cv2.waitKey(0)
-                cv2.destroyAllWindows()
-                
-            except rospy.ROSException:
-                rospy.logerr("等待图像消息超时，请检查相机是否已启动")
-            except Exception as e:
-                rospy.logerr(f"发生错误: {str(e)}")
+            
 
 
         
@@ -397,6 +433,7 @@ class SocketDemo(Thread):
                 self.tts_client.wait_for_service()
                 Thread(target=self.tts_client.call, args=(req,), daemon=True).start()
             if self.vlm_state == True:
+                # self.audio_thread.join(timeout=0.5)  # 停止播放盘古故事音频
                 self.vlm_state = False
 
             # 重置状态

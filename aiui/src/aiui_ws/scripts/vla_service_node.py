@@ -2,7 +2,10 @@
 # -*- coding:utf-8 -*-\
 # export LD_PRELOAD=/lib/x86_64-linux-gnu/libtiff.so.5
 import rospy
-from aiui.srv import VLAProcess, VLAProcessResponse, FeedbackService, FeedbackServiceRequest, IkOptService, IkOptServiceRequest
+from aiui.srv import VLAProcess, VLAProcessResponse
+from aiui.srv import FeedbackService, FeedbackServiceRequest
+from aiui.srv import IkOptService, IkOptServiceRequest
+from aiui.srv import TrajectoryService, TrajectoryServiceRequest
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import requests
@@ -20,7 +23,7 @@ class VLAServiceServer:
         # 初始化CV桥接器
         self.bridge = CvBridge()
         # API配置
-        self.api_url = rospy.get_param('~api_url', 'http://172.18.35.200:50001/process_image')
+        self.api_url = rospy.get_param('~api_url', 'http://172.18.35.200:50002/process_image')
         # 初始化服务
         self.service = rospy.Service('vla_service', VLAProcess, self.handle_vla_request)
         self.intr = {
@@ -95,6 +98,7 @@ class VLAServiceServer:
         """仅在服务调用时订阅一帧图像"""
         try:
             # 阻塞等待直到收到一帧图像（超时5秒）
+            rospy.loginfo("Waiting for image messages...")
             image_msg = rospy.wait_for_message("/camera/color/image_raw", Image, timeout=5.0)
 
             depth_msg = rospy.wait_for_message("/camera/depth/image_raw", Image, timeout=5.0)
@@ -107,8 +111,8 @@ class VLAServiceServer:
             depth_array[np.isinf(depth_array)] = 0
             cv_depth = depth_array.astype(np.uint16)
             # 保存原始深度为PNG文件（保留完整深度信息）
-            cv2.imwrite("depth_image_16bit.png", cv_depth)
-            cv2.imwrite("color_image.jpg", self.bridge.imgmsg_to_cv2(image_msg, "bgr8"))
+            cv2.imwrite("/home/whc/aiui_ws/src/aiui/depth_image_16bit.png", cv_depth)
+            cv2.imwrite("/home/whc/aiui_ws/src/aiui/color_image.jpg", self.bridge.imgmsg_to_cv2(image_msg, "bgr8"))
             
             
 
@@ -120,6 +124,7 @@ class VLAServiceServer:
         
         try:
             # 转换ROS图像为OpenCV格式并编码
+            rospy.loginfo("Processing image and depth data...")
             # cv_image = self.bridge.imgmsg_to_cv2(image_msg, "bgr8")
             # _, buffer = cv2.imencode('.jpg', cv_image)
             # encoded_image = base64.b64encode(buffer).decode('utf-8')
@@ -142,16 +147,17 @@ class VLAServiceServer:
             return VLAProcessResponse(error_msg)
 
         # 获取机械臂当前位姿
-        arm_client = rospy.ServiceProxy("/aris_node/feedback_srv", FeedbackService)
-        arm_req = FeedbackServiceRequest()
-        arm_req.request = ''
-        arm_client.wait_for_service()
-        response = arm_client.call(arm_req)
-        pose = response.ee_pq_right
-        # [roll, pitch, yaw] = cv2.Rodrigues(np.array([pose[3], pose[4], pose[5]]))[0].flatten()
-        [roll , pitch, yaw] = self.quaternion_to_euler(pose[3], pose[4], pose[5], pose[6])
-        [x, y, z, rx, ry, rz] = [pose[0], pose[1], pose[2], roll, pitch, yaw]
-        pose_converted = [x, y, z, rx, ry, rz]
+        # rospy.loginfo("Getting current arm pose...")
+        # arm_client = rospy.ServiceProxy("/aris_node/feedback_srv", FeedbackService)
+        # arm_req = FeedbackServiceRequest()
+        # arm_req.request = ''
+        # arm_client.wait_for_service()
+        # response = arm_client.call(arm_req)
+        # pose = response.ee_pq_right
+        # [roll , pitch, yaw] = self.quaternion_to_euler(pose[3], pose[4], pose[5], pose[6])
+        # [x, y, z, rx, ry, rz] = [pose[0], pose[1], pose[2], roll, pitch, yaw]
+        # pose_converted = [x, y, z, rx, ry, rz]
+        pose_converted = [0, 0, 0, 0, 0, 0]  # 初始化为零
         rospy.loginfo(f"机械臂当前位姿：{pose_converted}")
         # 包装数据并发送请求到VLA API
         files = {
@@ -166,12 +172,12 @@ class VLAServiceServer:
         }
 
         try:
-            # print(f"Sending request to API: {self.api_url}")
+            rospy.loginfo(f"Sending request to API: {self.api_url}")
             response = requests.post(self.api_url, files=files, data=text_data, timeout=30)
-            # rospy.loginfo(f"API Response Status: {response.status_code}")
+            rospy.loginfo(f"API Response Status: {response.status_code}")
             if response.ok:
                 data = response.json()
-                # rospy.loginfo(f"API Response Data: {data}")
+                rospy.loginfo(f"API Response Data: {data}")
                 # result = data.get("read_message", "Wrong Name for Getter Or No valid result")
                 # result = data.get("message", "Wrong Name for Getter Or No valid result")
                 # rospy.loginfo(result)
@@ -184,7 +190,7 @@ class VLAServiceServer:
                     target_rx = data.get('rotation_x')
                     target_ry = data.get('rotation_y')
                     target_rz = data.get('rotation_z')
-                    rospy.loginfo(f"目标位置: {target_x}, {target_y}, {target_z}, 旋转角度: {target_rx}, {target_ry}, {target_rz}")
+                    rospy.loginfo(f"cam-目标位置: {target_x}, {target_y}, {target_z}, 旋转角度: {target_rx}, {target_ry}, {target_rz}")
 
                     # 旋转矩阵
                     # target_r_incamera = R.from_euler('xyz', [target_rx, target_ry, target_rz], degrees=False).as_matrix()
@@ -196,6 +202,7 @@ class VLAServiceServer:
                     camera_rotation = np.array([[0.04205621, 0.0202342, 0.99891033],
                                                 [-0.1034163, -0.99433648, 0.0244956],
                                                 [0.99374863, -0.1043338, -0.03972548]])
+                    print(camera_rotation)
                     
                     # 计算目标物体在机械臂基坐标系下的旋转矩阵
                     # target_r_inbase = np.dot(camera_rotation, target_r_incamera)
@@ -208,13 +215,15 @@ class VLAServiceServer:
                     target_position = np.array([[target_x], [target_y], [target_z]])
                     print(f"目标位置（列向量）: {target_position}")
                     # 旋转矩阵乘以目标位置
-                    target_position_inbase = np.dot(camera_rotation, target_position) + np.array([ [0.08589616], [-0.16534466], [-0.10202788]])
+                    target_position_inbase = np.dot(camera_rotation, target_position) + np.array([ [0.08589616], [-0.16534466], [-0.10202788]]) - np.array([[0.05656], [0], [-0.1414]])
                     print(f"目标位置在机械臂基坐标系下: {target_position_inbase}")
                     act = data.get('action')
-                    rospy.loginfo(f"目标位置: {target_x}, {target_y}, {target_z}, 旋转角度: {target_rx}, {target_ry}, {target_rz}, 动作: {act}")
+                    rospy.loginfo(f"arm-目标位置: {target_position_inbase[0].item()}, {target_position_inbase[1].item()}, {target_position_inbase[2].item()}, 旋转角度: {target_rx}, {target_ry}, {target_rz}, 动作: {act}")
 
                     # [w, x, y ,z] = self.euler_to_quaternion(target_rx, target_ry, target_rz)  # 确保转换正确
                     [w, x, y ,z] = [-0.65328148,  0.27059805 , 0.27059805 , 0.65328148]
+                    arm_data = [target_position_inbase[0].item(), target_position_inbase[1].item(), target_position_inbase[2].item(), w, x, y, z]
+                    rospy.loginfo(f"机械臂目标数据: {arm_data}")
                     parsed_result = {
                         'target_x': target_position_inbase[0],
                         'target_y': target_position_inbase[1],
@@ -223,24 +232,21 @@ class VLAServiceServer:
                         'quaternion_x': x,
                         'quaternion_y': y,
                         'quaternion_z': z,
-                        # 'rotation_x': rx,
-                        # 'rotation_y': ry,
-                        # 'rotation_z': rz,
                         'action': act
                     }
-                    rospy.loginfo(f"Parsed Result: {parsed_result}")
-                    arm_client = rospy.ServiceProxy("/aris_node/ik_opt_srv", IkOptService)
-                    ik_req = IkOptServiceRequest()
-                    ik_req.target_pq[0] = target_x
-                    ik_req.target_pq[1] = target_y
-                    ik_req.target_pq[2] = target_z
-                    ik_req.target_pq[3] = w
-                    ik_req.target_pq[4] = x 
-                    ik_req.target_pq[5] = y
-                    ik_req.target_pq[6] = z
-                    ik_req.action = act
+                    # rospy.loginfo(f"Parsed Result: {parsed_result}")
+                    arm_client = rospy.ServiceProxy("/aris_node/traj_srv", TrajectoryService)
+                    traj_req = TrajectoryServiceRequest()
+                    traj_req.target_pq[0] = target_position_inbase[0].item()
+                    traj_req.target_pq[1] = target_position_inbase[1].item()
+                    traj_req.target_pq[2] = target_position_inbase[2].item()
+                    traj_req.target_pq[3] = w
+                    traj_req.target_pq[4] = x 
+                    traj_req.target_pq[5] = y
+                    traj_req.target_pq[6] = z
+                    # ik_req.action = act
                     arm_client.wait_for_service()
-                    ik_response = arm_client.call(ik_req)
+                    ik_response = arm_client.call(traj_req)
                     
                 except:
                     # parsed_result = str(result)
