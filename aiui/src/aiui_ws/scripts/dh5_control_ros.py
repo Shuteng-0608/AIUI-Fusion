@@ -466,7 +466,7 @@ class DH5ModbusAPI:
             result = self.set_all([930, 1770, 1707, 1730, 1730, 980], speed_list=[30, 30, 30, 30, 30, 30])
         elif state == "close":
             # == CLOSE == #
-            result = self.set_all([300, 500, 500, 500, 500, 400], speed_list=[100, 30, 30, 30, 30, 30])
+            result = self.set_all([300, 500, 500, 500, 500, 200], speed_list=[100, 30, 30, 30, 30, 30])
         else:
             result = 2
         return result

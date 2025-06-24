@@ -6,6 +6,7 @@ from aiui.srv import VLAProcess, VLAProcessResponse
 from aiui.srv import FeedbackService, FeedbackServiceRequest
 from aiui.srv import IkOptService, IkOptServiceRequest
 from aiui.srv import TrajectoryService, TrajectoryServiceRequest
+from aiui.srv import TTS, TTSRequest
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import requests
@@ -14,7 +15,7 @@ import ast
 import cv2
 import numpy as np
 import traceback
-
+from threading import Thread
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 
@@ -32,6 +33,7 @@ class VLAServiceServer:
             'fx': 613.6777954101562,
             'fy': 613.6703491210938
         }
+        self.tts_client = rospy.ServiceProxy('tts_service', TTS)
         rospy.loginfo("VLA Service Server is ready")
         """
         K: [613.6777954101562, 0.0,                 640.4387817382812, 
@@ -184,13 +186,27 @@ class VLAServiceServer:
                 # 安全解析返回结果
                 try:
                     # 提取数据
-                    target_x = data.get('target_x')
-                    target_y = data.get('target_y')
-                    target_z = data.get('target_z')
+                    target_x = data.get('target_x', 0.0)
+                    target_y = data.get('target_y', 0.0)
+                    target_z = data.get('target_z', 0.0)
                     target_rx = data.get('rotation_x')
                     target_ry = data.get('rotation_y')
                     target_rz = data.get('rotation_z')
                     rospy.loginfo(f"cam-目标位置: {target_x}, {target_y}, {target_z}, 旋转角度: {target_rx}, {target_ry}, {target_rz}")
+                    if abs(target_x) + abs(target_y) + abs(target_z) < 0.01:
+                        self.tts_text = "这个位置不太好抓哦，能不能换个位置试试？"
+                        req = TTSRequest()
+                        req.request = self.tts_text
+                        self.tts_client.wait_for_service()
+                        Thread(target=self.tts_client.call, args=(req,), daemon=True).start()
+                        rospy.logwarn("目标位置过小，可能是无效数据，返回空响应")
+                        return VLAProcessResponse("目标位置过小，可能是无效数据")
+                    else:
+                        self.tts_text = "拿稳喽，不要乱动哦！"
+                        req = TTSRequest()
+                        req.request = self.tts_text
+                        self.tts_client.wait_for_service()
+                        Thread(target=self.tts_client.call, args=(req,), daemon=True).start()
 
                     # 旋转矩阵
                     # target_r_incamera = R.from_euler('xyz', [target_rx, target_ry, target_rz], degrees=False).as_matrix()
@@ -221,13 +237,13 @@ class VLAServiceServer:
                     rospy.loginfo(f"arm-目标位置: {target_position_inbase[0].item()}, {target_position_inbase[1].item()}, {target_position_inbase[2].item()}, 旋转角度: {target_rx}, {target_ry}, {target_rz}, 动作: {act}")
 
                     # [w, x, y ,z] = self.euler_to_quaternion(target_rx, target_ry, target_rz)  # 确保转换正确
-                    [w, x, y ,z] = [-0.65328148,  0.27059805 , 0.27059805 , 0.65328148]
+                    [w, x, y ,z] = [0, 0.9238915, 0, -0.3826545]
                     arm_data = [target_position_inbase[0].item(), target_position_inbase[1].item(), target_position_inbase[2].item(), w, x, y, z]
                     rospy.loginfo(f"机械臂目标数据: {arm_data}")
                     parsed_result = {
-                        'target_x': target_position_inbase[0],
-                        'target_y': target_position_inbase[1],
-                        'target_z': target_position_inbase[2],
+                        'target_x': target_position_inbase[0].item(),
+                        'target_y': target_position_inbase[1].item(),
+                        'target_z': target_position_inbase[2].item(),
                         'quaternion_w': w,
                         'quaternion_x': x,
                         'quaternion_y': y,

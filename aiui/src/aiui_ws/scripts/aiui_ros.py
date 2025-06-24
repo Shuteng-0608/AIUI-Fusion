@@ -70,6 +70,7 @@ class SocketDemo(Thread):
         self.vlm_client = rospy.ServiceProxy("vlm_service",VLMProcess)
         self.tts_client = rospy.ServiceProxy("tts_service",TTS)
         self.dh5_client = rospy.ServiceProxy("/dh5/set_all_position",DH5SetPosition)
+        self.vla_client = rospy.ServiceProxy("vla_service", VLAProcess)
         self.pending_response = []  # 暂存中间段(状态1)的文本
         self.current_response = ""  # 当前拼接中的完整回复
         self.seen_status_0 = False  # 标记是否见过状态0
@@ -303,7 +304,7 @@ class SocketDemo(Thread):
             self.vlm_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行视觉语言动作")
             tts_req = TTSRequest()
-            tts_req.request = "好的，很高兴可以帮到你"
+            tts_req.request = "好的，没问题！"
             self.tts_client.wait_for_service()
             Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
 
@@ -312,10 +313,10 @@ class SocketDemo(Thread):
             # client.call(tts_req)
             # client.close()
 
-            vla_req = VLAProcess()
-            vla_req.request = self.vla_text
-            self.arm_client.wait_for_service()
-            Thread(target=self.arm_client.call, args=(vla_req,), daemon=True).start()
+            vla_req = VLAProcessRequest()
+            vla_req.prompt = self.vlm_text
+            self.vla_client.wait_for_service()
+            Thread(target=self.vla_client.call, args=(vla_req,), daemon=True).start()
         
         elif intent == "vlm":
             self.vlm_state = True
@@ -524,6 +525,7 @@ class SocketDemo(Thread):
             return
         try:
             self.vlm_text = parsed_data.get('semantic', {})[0].get('template', "")
+            rospy.loginfo(f"技能 VLM 文本: {self.vlm_text} ")
         except (IndexError, AttributeError, TypeError, KeyError) as e:
             self.vlm_text = ""
             rospy.logerr(f"语义vlm解析小异常: {str(e)}")
