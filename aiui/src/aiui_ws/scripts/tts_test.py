@@ -94,10 +94,9 @@ class WsapiClient(WebSocketClient):
                 else:
                     rospy.loginfo("我没有理解你说的话啊")
             elif data['sub'] == "tts":
-                # TODO 播报pcm音频
+                # TODO : 处理 TTS 结果
                 tts_url = base64.b64decode(data['content']).decode()
-                rospy.loginfo("tts: " + tts_url)
-                # download_and_play_tts(tts_url)
+                
         else:
             rospy.loginfo(s)
 
@@ -106,36 +105,6 @@ def get_auth_id():
     mac = uuid.UUID(int=uuid.getnode()).hex[-12:]
     return hashlib.md5(":".join([mac[e:e + 2] for e in range(0, 11, 2)]).encode("utf-8")).hexdigest()
 
-
-def play_audio(file_path):
-    pygame.mixer.init()
-    pygame.mixer.music.load(file_path)
-    pygame.mixer.music.play()
-    while pygame.mixer.music.get_busy():  # 等待播放结束
-        pygame.time.Clock().tick(10)
-
-
-def download_and_play_tts(url):
-    try:
-        # 下载MP3文件
-        response = requests.get(url)
-        response.raise_for_status()  # 检查请求是否成功
-        
-        # 保存临时文件
-        temp_file = "temp_tts.mp3"
-        with open(temp_file, 'wb') as f:
-            f.write(response.content)
-        
-        rospy.loginfo(f"已下载TTS音频到: {temp_file}")
-        
-        # 播放音频
-        # playsound(temp_file)
-        # play_audio(temp_file)
-        # 删除临时文件（可选）
-        # os.remove(temp_file)
-        
-    except Exception as e:
-        rospy.logerr(f"下载或播放音频时出错: {e}")
 
 
 
@@ -211,7 +180,7 @@ def handle_tts_request(req):
     resp = TTSResponse()
     resp.response = "Success"
     resp.tts_url = tts_url
-    print(tts_url)
+    rospy.loginfo(f"TTS URL: {tts_url}")
     return resp
 
     

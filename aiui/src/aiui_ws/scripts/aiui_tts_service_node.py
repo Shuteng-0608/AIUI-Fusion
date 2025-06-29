@@ -179,6 +179,7 @@ def handle_tts_request(req):
             "data_type": "text",
             "vcn": "x4_lingfeizhe_oral",
             "speed": "50",
+            "volume": "100",
             "scene": "IFLYTEK.tts",
             "tts_res_type": "url",
             "context": "{{\\\"sdk_support\\\":[\\\"tts\\\"]}}"
@@ -206,6 +207,7 @@ def handle_tts_request(req):
 
     resp = TTSResponse()
     resp.response = "Success"
+    resp.tts_url = "tts_url"  # 这里可以设置一个默认的URL或根据实际情况返回
     return resp
 
     
