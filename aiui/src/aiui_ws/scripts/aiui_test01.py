@@ -122,6 +122,12 @@ class SocketDemo(Thread):
                 req.request = text
                 self.tts_client.wait_for_service()
                 resp = self.tts_client.call(req)
+                if resp.tts_url == "tts_url":
+                    rospy.logwarn("TTS服务未返回有效的音频URL")
+                    resp = self.tts_client.call(req)
+                    rospy.logwarn(resp)
+                    rospy.logwarn("重试中...")
+
                 # 获取保存的音频文件名
                 file_url = resp.tts_url
                 try:
@@ -153,6 +159,7 @@ class SocketDemo(Thread):
     
     # 音频播放线程函数
     def play_audio_from_queue(self):
+
         while not self.stop_event.is_set():
             try:
                 # 获取音频文件路径
@@ -190,7 +197,8 @@ class SocketDemo(Thread):
             except Exception as e:
                 rospy.logerr(f"Error in audio playback: {str(e)}")
     
-     # 将文本添加到TTS队列
+
+    # 将文本添加到TTS队列
     def add_to_tts_queue(self, text):
         if text:
             self.tts_queue.put(text)
@@ -401,7 +409,7 @@ class SocketDemo(Thread):
             # self.labTour()
         elif intent == "Bow":
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行鞠躬欢送动作")
-            self.sentence_buffer.append_text("哇时间过得好快！再见喽，期待下次再和您见面，记得要常来看我哦！")
+            self.sentence_buffer.append_text("哇时间过得好快, 再见喽，期待下次再和您见面，记得要常来看我哦！")
             req = StringServiceRequest()
             req.request = '5' # TODO
             # self.arm_client.wait_for_service()
@@ -431,15 +439,12 @@ class SocketDemo(Thread):
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行描述动作")
             self.sentence_buffer.append_text("好的，让我仔细看一下！")
 
-            
             vlm_req = VLMProcessRequest()
             vlm_req.prompt = self.vlm_text
             # self.vlm_client.wait_for_service()
             resp = self.vlm_client.call(vlm_req)
             vlm_result = resp.vlm_result
             rospy.loginfo(f"VLM 结果: {vlm_result}")
-
-            # self.flush_all()  # 清空之前的缓冲区
             self.sentence_buffer.append_text(vlm_result)
 
         elif intent == "self_photo":
@@ -508,7 +513,7 @@ class SocketDemo(Thread):
             
             if self.intent_state == True:
                 # 如果是 intent-activated 状态，直接清空缓冲区
-                self.flush_all()
+                # self.flush_all()
                 self.intent_state = False
                 rospy.loginfo("意图状态已重置")
             
