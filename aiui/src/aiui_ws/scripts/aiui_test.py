@@ -169,17 +169,17 @@ class SocketDemo(Thread):
         self.detected_intent = None
         self.tts_text = ""
         self.wakeup_state = False
+
         self.arm_client = rospy.ServiceProxy("aris_node/cmd_str_srv",StringService)
         self.vlm_client = rospy.ServiceProxy("vlm_service",VLMProcess)
         self.tts_client = rospy.ServiceProxy("tts_service",TTS)
         self.dh5_client = rospy.ServiceProxy("/dh5/set_all_position",DH5SetPosition)
         self.vla_client = rospy.ServiceProxy("vla_service", VLAProcess)
-        self.pending_response = []  # 暂存中间段(状态1)的文本
-        self.current_response = ""  # 当前拼接中的完整回复
+
         self.seen_status_0 = False  # 标记是否见过状态0
-        self.vlm_state = False  # VLM状态标志
+        self.intent_state = False  # intent状态标志
         self.vlm_text = ""  # VLM文本
-        self.vla_text = ""
+        self.vla_text = ""  # VLA文本
         self.audio_thread = None  # 用于播放音频的线程
         # 新增的音频处理系统
         pygame.mixer.init()
@@ -192,12 +192,42 @@ class SocketDemo(Thread):
         Thread(target=self.process_tts_queue, daemon=True).start()
         Thread(target=self.play_audio_from_queue, daemon=True).start()
         # 创建句子缓冲区
-        self.sentence_buffer = SentenceBuffer(min_sentence_length=2, max_sentence_length=50)
+        self.sentence_buffer = SentenceBuffer(min_sentence_length=2, max_sentence_length=100)
         
         # 启动句子处理线程
         self.sentence_processing_thread = Thread(target=self.process_sentences, daemon=True)
         self.sentence_processing_thread.start()
 
+
+    def flush_all(self):
+        """清空所有队列和缓冲区，删除相关音频文件"""
+        with self.sentence_buffer.lock:
+            # 清空文本缓冲区
+            if self.sentence_buffer.buffer:
+                self.tts_queue.put(self.sentence_buffer.buffer)
+                self.sentence_buffer.buffer = ""
+            
+            # 清空TTS队列
+            while not self.tts_queue.empty():
+                try:
+                    text = self.tts_queue.get_nowait()
+                    if text:
+                        rospy.loginfo(f"清空TTS队列中的文本: {text}")
+                except queue.Empty:
+                    break
+            
+            while not self.audio_queue.empty():
+                try:
+                    # 获取队列中的音频文件路径
+                    audio_path = self.audio_queue.get_nowait()
+                    try:
+                        os.remove(audio_path)
+                        rospy.loginfo(f"已删除临时文件: {audio_path}")
+                    except Exception as e:
+                        rospy.logwarn(f"删除临时文件失败: {e}")
+                    
+                except queue.Empty:
+                    break
 
     # 处理TTS队列的线程函数
     def process_tts_queue(self):
@@ -457,8 +487,11 @@ class SocketDemo(Thread):
 
 
     def handle_detected_intent(self, intent):
+        self.intent_state = True  # 重置意图状态
+        self.flush_all()  # 清空之前的缓冲区
         if intent == "SayHi":
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行打招呼动作")
+            self.sentence_buffer.append_text("你好呀，欢迎您来到南方科技大学机器人研究院，很高兴见到您！")
             req = StringServiceRequest()
             req.request = '3'
             self.arm_client.wait_for_service()
@@ -466,6 +499,7 @@ class SocketDemo(Thread):
 
         elif intent == "handshake":
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行握手动作")
+            self.sentence_buffer.append_text("好呀，和我握个手吧，很高兴认识你，我还想再多和你交流交流呢！")
             req = StringServiceRequest()
             req.request = '4' # TODO
             self.arm_client.wait_for_service()
@@ -481,25 +515,25 @@ class SocketDemo(Thread):
             # self.labTour()
         elif intent == "Bow":
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行鞠躬欢送动作")
+            self.sentence_buffer.append_text("哇时间过得好快！再见喽，期待下次再和您见面，记得要常来看我哦！")
             req = StringServiceRequest()
             req.request = '5' # TODO
             self.arm_client.wait_for_service()
             Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
 
  
-        # elif intent == "Nod":
-        #     print(f"检测到 [{intent}] 意图, 执行点头动作")
-        #     # client = rospy.ServiceProxy("cmd_str_srv",StringService)
-        #     req = StringServiceRequest()
-        #     req.request = '2' # TODO
-        #     self.arm_client.wait_for_service()
-        #     # self.arm_client.call(req)
-        #     Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
+        elif intent == "Nod":
+            print(f"检测到 [{intent}] 意图, 执行点头动作")
+            self.sentence_buffer.append_text("我叫南科盘古，我是南方科技大学机器人研究院研发的第一款人形机器人，我可以做一些简单的交互动作，还可以陪你闲聊散心，另外我还是实验室的科研小助手，想知道今天的天气也可以问我哦！")
+            
+            # req = StringServiceRequest()
+            # req.request = '2' # TODO
+            # self.arm_client.wait_for_service()
+            # self.arm_client.call(req)
+            # Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
         
         elif intent == "vla":
-            self.vlm_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行视觉语言动作")
-            self.sentence_buffer.flush()  # 清空之前的缓冲区
             self.sentence_buffer.append_text("好的，没问题！")
 
             vla_req = VLAProcessRequest()
@@ -508,9 +542,7 @@ class SocketDemo(Thread):
             Thread(target=self.vla_client.call, args=(vla_req,), daemon=True).start()
         
         elif intent == "vlm":
-            self.vlm_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行描述动作")
-            self.sentence_buffer.flush()  # 清空之前的缓冲区
             self.sentence_buffer.append_text("好的，让我仔细看一下！")
 
             
@@ -521,13 +553,12 @@ class SocketDemo(Thread):
             vlm_result = resp.vlm_result
             rospy.loginfo(f"VLM 结果: {vlm_result}")
 
-            self.sentence_buffer.flush()  # 清空之前的缓冲区
+            # self.flush_all()  # 清空之前的缓冲区
             self.sentence_buffer.append_text(vlm_result)
 
         elif intent == "self_photo":
-            self.vlm_state = True
+            self.intent_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行自拍动作")
-            self.sentence_buffer.flush()  # 清空之前的缓冲区
             self.sentence_buffer.append_text("好的，摆个点赞的姿势，来和我自拍一张吧")
             arm_req = StringServiceRequest()
             arm_req.request = '6'
@@ -535,15 +566,13 @@ class SocketDemo(Thread):
             Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
 
         elif intent == "pangu":
-            self.vlm_state = True
+            self.intent_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 讲述盘古开天地的故事")
-            self.sentence_buffer.flush()  # 清空之前的缓冲区
             self.sentence_buffer.append_text("好的，盘古是中国古代传说时期中开天辟地的神。在很久很久以前，宇宙混沌一团，盘古凭借着自己的神力把天地开辟出来了。")
             
         elif intent == "take_photo":
-            self.vlm_state = True
+            self.intent_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行拍照动作")
-            self.sentence_buffer.flush()  # 清空之前的缓冲区
             self.sentence_buffer.append_text("好的，没问题，大家都过来吧！站到我面前，让我来为大家拍一张大合照！")
             arm_req = StringServiceRequest()
             arm_req.request = '7'
@@ -571,36 +600,40 @@ class SocketDemo(Thread):
             rospy.loginfo(f"大模型回答结果是: {text_value}  {status_value}")
         # 状态0: 新响应开始
         if status_value == 0:
-            if self.vlm_state == True:
+            if self.intent_state == True:
                 # 如果是VLM状态，直接清空缓冲区
-                self.sentence_buffer.flush()
+                self.flush_all()
                 self.seen_status_0 = False  # 重置状态标志
             else:
                 self.seen_status_0 = True  # 标记已见过状态0
-            self.sentence_buffer.flush()  # 清空之前的缓冲区
+            self.flush_all()  # 清空之前的缓冲区
             self.sentence_buffer.append_text(text_value)
 
         # 状态1: 中间段落
         elif status_value == 1:
-            if self.vlm_state == True:
+            if self.intent_state == True:
                 # 如果是VLM状态，直接清空缓冲区
-                self.sentence_buffer.flush()
+                self.flush_all()
                 self.seen_status_0 = False  # 重置状态标志
             if not self.seen_status_0:
                 # 如果之前没有见过状态0，直接清空缓冲区
-                self.sentence_buffer.flush()
+                self.flush_all()
             else:
                 self.sentence_buffer.append_text(text_value)
 
         # 状态2: 最终段落
         elif status_value == 2:
-            if self.vlm_state == True:
+            if not self.seen_status_0:
+                # 如果之前没有见过状态0，直接清空缓冲区
+                self.flush_all()
+            if self.intent_state == True:
                 # 如果是VLM状态，直接清空缓冲区
-                self.sentence_buffer.flush()
-                self.vlm_state = False
+                self.flush_all()
+                self.intent_state = False
             else:
                 self.sentence_buffer.append_text(text_value)
                 self.sentence_buffer.flush()  # 处理剩余文本
+            self.seen_status_0 = False
 
         # 更新连贯性处理
         with self.audio_lock:
@@ -715,7 +748,7 @@ class SocketDemo(Thread):
                         if data.get('content', {}).get('eventType', {}) == 5:
                             self.wakeup_state = False
                             rospy.loginfo(f"唤醒结束：==== 我不在 ==== ")
-                            self.sentence_buffer.flush()  # 清空之前的缓冲区
+                            self.flush_all()  # 清空之前的缓冲区
                             self.sentence_buffer.append_text("我先退下啦！")
                             
 
@@ -724,7 +757,7 @@ class SocketDemo(Thread):
                             if self.wakeup_state == False:
                                 self.wakeup_state = True
                                 rospy.loginfo(f"唤醒成功：==== 我在 ==== ")
-                                self.sentence_buffer.flush()  # 清空之前的缓冲区
+                                self.flush_all()  # 清空之前的缓冲区
                                 self.sentence_buffer.append_text("我在！")
                                 
                             
