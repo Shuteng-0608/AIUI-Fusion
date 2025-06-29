@@ -62,7 +62,7 @@ logger.addHandler(console_handler)
 
 
 class SentenceBuffer:
-    def __init__(self, min_sentence_length=10, max_sentence_length=50):
+    def __init__(self, min_sentence_length=2, max_sentence_length=50):
         self.buffer = ""
         self.min_sentence_length = min_sentence_length  # 句子最小长度
         self.max_sentence_length = max_sentence_length  # 句子最大长度
@@ -192,7 +192,7 @@ class SocketDemo(Thread):
         Thread(target=self.process_tts_queue, daemon=True).start()
         Thread(target=self.play_audio_from_queue, daemon=True).start()
         # 创建句子缓冲区
-        self.sentence_buffer = SentenceBuffer(min_sentence_length=10, max_sentence_length=50)
+        self.sentence_buffer = SentenceBuffer(min_sentence_length=2, max_sentence_length=50)
         
         # 启动句子处理线程
         self.sentence_processing_thread = Thread(target=self.process_sentences, daemon=True)
@@ -459,28 +459,16 @@ class SocketDemo(Thread):
     def handle_detected_intent(self, intent):
         if intent == "SayHi":
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行打招呼动作")
-            # client = rospy.ServiceProxy("cmd_str_srv",StringService)
-            # self.arm_client = rospy.ServiceProxy("/aris_node/cmd_str_srv",StringService)
             req = StringServiceRequest()
             req.request = '3'
             self.arm_client.wait_for_service()
             Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
 
-            # client.close()
         elif intent == "handshake":
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行握手动作")
-            # client = rospy.ServiceProxy("cmd_str_srv",StringService)
-
             req = StringServiceRequest()
             req.request = '4' # TODO
             self.arm_client.wait_for_service()
-
-            # dh5_req = DH5SetPositionRequest()
-            # dh5_req.hand_type = 'right'  # 1 for right hand, 2 for left hand
-            # dh5_req.position_list = [800, 1500, 1500, 1500, 1500, 800]  # TODO for handshake position
-            # dh5_req.hand_mode = 'hand'
-            # self.dh5_client.wait_for_service()
-            # Thread(target=self.dh5_client.call, args=(dh5_req,), daemon=True).start()
             Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
 
             # client.close()
@@ -511,15 +499,8 @@ class SocketDemo(Thread):
         elif intent == "vla":
             self.vlm_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行视觉语言动作")
-            tts_req = TTSRequest()
-            tts_req.request = "好的，没问题！"
-            self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
-
-            # client = rospy.ServiceProxy("tts_service",TTS)
-            # client.wait_for_service()
-            # client.call(tts_req)
-            # client.close()
+            self.sentence_buffer.flush()  # 清空之前的缓冲区
+            self.sentence_buffer.append_text("好的，没问题！")
 
             vla_req = VLAProcessRequest()
             vla_req.prompt = self.vlm_text
@@ -528,34 +509,26 @@ class SocketDemo(Thread):
         
         elif intent == "vlm":
             self.vlm_state = True
-            self.tts_text = "好的，让我仔细看一下"
-            req = TTSRequest()
-            req.request = self.tts_text
-            self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(req,), daemon=True).start()
-
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行描述动作")
+            self.sentence_buffer.flush()  # 清空之前的缓冲区
+            self.sentence_buffer.append_text("好的，让我仔细看一下！")
+
+            
             vlm_req = VLMProcessRequest()
             vlm_req.prompt = self.vlm_text
             self.vlm_client.wait_for_service()
             resp = self.vlm_client.call(vlm_req)
             vlm_result = resp.vlm_result
             rospy.loginfo(f"VLM 结果: {vlm_result}")
-            
-            # 语音合成 VLM 结果
-            # client = rospy.ServiceProxy("tts_service",TTS)
-            req = TTSRequest()
-            req.request = vlm_result
-            self.tts_client.wait_for_service()
-            self.tts_client.call(req)
+
+            self.sentence_buffer.flush()  # 清空之前的缓冲区
+            self.sentence_buffer.append_text(vlm_result)
 
         elif intent == "self_photo":
             self.vlm_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行自拍动作")
-            tts_req = TTSRequest()
-            tts_req.request = "好的，摆个点赞的姿势，来和我自拍一张吧"
-            self.tts_client.wait_for_service()
-            self.tts_client.call(tts_req)
+            self.sentence_buffer.flush()  # 清空之前的缓冲区
+            self.sentence_buffer.append_text("好的，摆个点赞的姿势，来和我自拍一张吧")
             arm_req = StringServiceRequest()
             arm_req.request = '6'
             self.arm_client.wait_for_service()
@@ -564,29 +537,20 @@ class SocketDemo(Thread):
         elif intent == "pangu":
             self.vlm_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 讲述盘古开天地的故事")
-            tts_req = TTSRequest()
-            tts_req.request = "好的, 盘古是中国古代传说时期中开天辟地的神。在天地还没有开辟以前，宇宙混沌一团，盘古凭借着自己的神力把天地开辟出来了。他的左眼变成了太阳，右眼变成了月亮；头发和胡须变成了夜空的星星；他的身体变成了东、西、南、北四极和雄伟的三山五岳；血液变成了江河；牙齿、骨骼和骨髓变成了地下矿藏；皮肤和汗毛变成了大地上的草木；汗水变成了雨露"
-            self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
-            # self.play_audio("/home/whc/aiui_ws/src/aiui/audio/pangu.mp3")
-            # audio_thread = threading.Thread(target=self.play_audio, args=("/home/whc/aiui_ws/pangu.mp3",), daemon=True)
-            # self.audio_thread = Thread(target=self.play_audio, args=("/home/whc/aiui_ws/pangu.mp3",), daemon=True)
-            # self.audio_thread.start()
+            self.sentence_buffer.flush()  # 清空之前的缓冲区
+            self.sentence_buffer.append_text("好的，盘古是中国古代传说时期中开天辟地的神。在很久很久以前，宇宙混沌一团，盘古凭借着自己的神力把天地开辟出来了。")
             
         elif intent == "take_photo":
             self.vlm_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行拍照动作")
-            tts_req = TTSRequest()
-            tts_req.request = "好的，没问题，大家都过来吧！站到我面前，让我来为大家拍一张大合照！"
-            self.tts_client.wait_for_service()
-            self.tts_client.call(tts_req)
+            self.sentence_buffer.flush()  # 清空之前的缓冲区
+            self.sentence_buffer.append_text("好的，没问题，大家都过来吧！站到我面前，让我来为大家拍一张大合照！")
             arm_req = StringServiceRequest()
             arm_req.request = '7'
             self.arm_client.wait_for_service()
             Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
             
             self.thake_photo()
-            # Thread(target=self.play_audio, args=("/home/whc/aiui_ws/src/aiui/audio/take_photo.mp3",), daemon=True).start()
 
             
     # 替换原有的play_audio函数
@@ -607,18 +571,36 @@ class SocketDemo(Thread):
             rospy.loginfo(f"大模型回答结果是: {text_value}  {status_value}")
         # 状态0: 新响应开始
         if status_value == 0:
+            if self.vlm_state == True:
+                # 如果是VLM状态，直接清空缓冲区
+                self.sentence_buffer.flush()
+                self.seen_status_0 = False  # 重置状态标志
+            else:
+                self.seen_status_0 = True  # 标记已见过状态0
             self.sentence_buffer.flush()  # 清空之前的缓冲区
             self.sentence_buffer.append_text(text_value)
 
         # 状态1: 中间段落
         elif status_value == 1:
-            self.sentence_buffer.append_text(text_value)
+            if self.vlm_state == True:
+                # 如果是VLM状态，直接清空缓冲区
+                self.sentence_buffer.flush()
+                self.seen_status_0 = False  # 重置状态标志
+            if not self.seen_status_0:
+                # 如果之前没有见过状态0，直接清空缓冲区
+                self.sentence_buffer.flush()
+            else:
+                self.sentence_buffer.append_text(text_value)
 
         # 状态2: 最终段落
         elif status_value == 2:
-            
-            self.sentence_buffer.append_text(text_value)
-            self.sentence_buffer.flush()  # 处理剩余文本
+            if self.vlm_state == True:
+                # 如果是VLM状态，直接清空缓冲区
+                self.sentence_buffer.flush()
+                self.vlm_state = False
+            else:
+                self.sentence_buffer.append_text(text_value)
+                self.sentence_buffer.flush()  # 处理剩余文本
 
         # 更新连贯性处理
         with self.audio_lock:
@@ -645,12 +627,9 @@ class SocketDemo(Thread):
             
 
     def get_intent_result(self, data):
-        # intent_data = data.get('content', {}).get('result', {}).get()
         text_value = data.get('content', {}).get(
             'result', {}).get('cbm_semantic', {}).get('text')
         rospy.loginfo(f"技能 text_value: {text_value} ")
-        # self.vlm_text = data.get('content', {}).get('result', {}).get('cbm_semantic', {}).get('text').get('semantic', {}).get('template')
-        # print(f"技能 VLM 文本: {self.vlm_text} ")
         intent = json.loads(text_value)
         rc = intent['rc']
         if (rc == 0):
@@ -662,10 +641,10 @@ class SocketDemo(Thread):
             return
         try:
             self.vlm_text = parsed_data.get('semantic', {})[0].get('template', "")
-            rospy.loginfo(f"技能 VLM 文本: {self.vlm_text} ")
+            rospy.loginfo(f"技能 VLM / VLA 文本: {self.vlm_text} ")
         except (IndexError, AttributeError, TypeError, KeyError) as e:
             self.vlm_text = ""
-            rospy.logerr(f"语义vlm解析小异常: {str(e)}")
+            rospy.logerr(f"语义 VLM / VLA解析小异常: {str(e)}")
         try:
             self.detected_intent = parsed_data.get('semantic', {})[0].get('intent', {})
 
@@ -736,24 +715,18 @@ class SocketDemo(Thread):
                         if data.get('content', {}).get('eventType', {}) == 5:
                             self.wakeup_state = False
                             rospy.loginfo(f"唤醒结束：==== 我不在 ==== ")
-                            client = rospy.ServiceProxy("tts_service",TTS)
-                            req = TTSRequest()
-                            req.request = "我先退下啦！"
-                            client.wait_for_service()
-                            client.call(req)
-                            client.close()
+                            self.sentence_buffer.flush()  # 清空之前的缓冲区
+                            self.sentence_buffer.append_text("我先退下啦！")
+                            
 
                         if data.get('content', {}).get('eventType', {}) == 4:
                             
                             if self.wakeup_state == False:
                                 self.wakeup_state = True
                                 rospy.loginfo(f"唤醒成功：==== 我在 ==== ")
-                                client = rospy.ServiceProxy("tts_service",TTS)
-                                req = TTSRequest()
-                                req.request = "我在！"
-                                client.wait_for_service()
-                                client.call(req)
-                                client.close()
+                                self.sentence_buffer.flush()  # 清空之前的缓冲区
+                                self.sentence_buffer.append_text("我在！")
+                                
                             
                         if (self.aiui_type == "iat"):
                             self.get_iat_result(data)
