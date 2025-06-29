@@ -64,6 +64,7 @@ add_service_files(
   VLAProcess.srv
   DH5SetPosition.srv
   IkOptService.srv
+  TrajectoryService.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -170,10 +171,12 @@ catkin_install_python(PROGRAMS
   scripts/aiui_tts_service_node.py
   scripts/vlm_service_node.py
   scripts/vla_service_node.py
-  scripts/demo01.py
-  scripts/demo02.py
   scripts/dh5_control.py
   scripts/dh5_control_ros.py
+  scripts/aiui_test.py
+  scripts/aiui_test01.py
+  scripts/tts_test.py
+  scripts/keyboard_action.py
   # hand_eye_calibration/hand_eye_calibration.py
   hand_eye_calibration/collect_data_ros.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
