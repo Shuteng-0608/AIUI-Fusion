@@ -1,3 +1,6 @@
 string request
+int32 index1
+int32 index2
+int32 index3
 ---
 string response
