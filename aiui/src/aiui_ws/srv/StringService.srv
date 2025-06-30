@@ -1,6 +1,6 @@
-string request
-int32 index1
-int32 index2
-int32 index3
+int32 request
+int32 a
+int32 b
+
 ---
 string response
