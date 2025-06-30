@@ -54,12 +54,13 @@ class SocketDemo(Thread):
 
         self.arm_client = rospy.ServiceProxy("aris_node/cmd_str_srv",StringService)
         self.vlm_client = rospy.ServiceProxy("vlm_service",VLMProcess)
-        self.tts_client = rospy.ServiceProxy("tts_service",TTS)
+        self.tts_client = rospy.ServiceProxy("/tts_service/generator",TTS)
         self.dh5_client = rospy.ServiceProxy("/dh5/set_all_position",DH5SetPosition)
         self.vla_client = rospy.ServiceProxy("vla_service", VLAProcess)
 
         self.seen_status_0 = False  # 标记是否见过状态0
         self.intent_state = False  # intent状态标志
+        self.openQA = False  # 是否开启开放式问答
         self.vlm_text = ""  # VLM文本
         self.vla_text = ""  # VLA文本
         self.audio_thread = None  # 用于播放音频的线程
@@ -120,13 +121,13 @@ class SocketDemo(Thread):
                 # 调用TTS服务
                 req = TTSRequest()
                 req.request = text
-                self.tts_client.wait_for_service()
+                # self.tts_client.wait_for_service()
                 resp = self.tts_client.call(req)
-                if resp.tts_url == "tts_url":
-                    rospy.logwarn("TTS服务未返回有效的音频URL")
-                    resp = self.tts_client.call(req)
-                    rospy.logwarn(resp)
-                    rospy.logwarn("重试中...")
+                # if resp.tts_url == "tts_url":
+                #     rospy.logwarn("TTS服务未返回有效的音频URL")
+                #     resp = self.tts_client.call(req)
+                #     rospy.logwarn(resp)
+                #     rospy.logwarn("重试中...")
 
                 # 获取保存的音频文件名
                 file_url = resp.tts_url
@@ -388,7 +389,7 @@ class SocketDemo(Thread):
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行打招呼动作")
             self.sentence_buffer.append_text("你好呀，欢迎您来到南方科技大学机器人研究院，很高兴见到您！")
             req = StringServiceRequest()
-            req.request = '3'
+            req.request = 3
             # self.arm_client.wait_for_service()
             Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
 
@@ -396,7 +397,7 @@ class SocketDemo(Thread):
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行握手动作")
             self.sentence_buffer.append_text("好呀，和我握个手吧，很高兴认识你，我还想再多和你交流交流呢！")
             req = StringServiceRequest()
-            req.request = '4' # TODO
+            req.request = 4 # TODO
             # self.arm_client.wait_for_service()
             Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
 
@@ -411,14 +412,19 @@ class SocketDemo(Thread):
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行鞠躬欢送动作")
             self.sentence_buffer.append_text("哇时间过得好快, 再见喽，期待下次再和您见面，记得要常来看我哦！")
             req = StringServiceRequest()
-            req.request = '5' # TODO
+            req.request = 5 # TODO
             # self.arm_client.wait_for_service()
             Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
 
  
         elif intent == "Nod":
             print(f"检测到 [{intent}] 意图, 执行点头动作")
-            self.sentence_buffer.append_text("我叫南科盘古，我是南方科技大学机器人研究院研发的第一款人形机器人，我可以做一些简单的交互动作，还可以陪你闲聊散心，另外我还是实验室的科研小助手，想知道今天的天气也可以问我哦！")
+            self.sentence_buffer.append_text("我叫南科盘古，")
+            self.sentence_buffer.append_text("我是南方科技大学机器人研究院研发的第一款人形机器人，")
+            self.sentence_buffer.append_text("我可以做一些简单的交互动作，")
+            self.sentence_buffer.append_text("还可以陪你闲聊散心,")
+            self.sentence_buffer.append_text("另外我还是实验室的科研小助手，")
+            self.sentence_buffer.append_text("想知道今天的天气也可以问我哦！")
             
             # req = StringServiceRequest()
             # req.request = '2' # TODO
@@ -452,21 +458,22 @@ class SocketDemo(Thread):
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行自拍动作")
             self.sentence_buffer.append_text("好的，摆个点赞的姿势，来和我自拍一张吧")
             arm_req = StringServiceRequest()
-            arm_req.request = '6'
+            arm_req.request = 6
             # self.arm_client.wait_for_service()
             Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
 
         elif intent == "pangu":
             self.intent_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 讲述盘古开天地的故事")
-            self.sentence_buffer.append_text("好的，盘古是中国古代传说时期中开天辟地的神。在很久很久以前，宇宙混沌一团，盘古凭借着自己的神力把天地开辟出来了。")
+            self.sentence_buffer.append_text("好的，盘古是中国古代传说时期中开天辟地的神。")
+            self.sentence_buffer.append_text("在很久很久以前，宇宙混沌一团，盘古凭借着自己的神力把天地开辟出来了。")
             
         elif intent == "take_photo":
             self.intent_state = True
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行拍照动作")
             self.sentence_buffer.append_text("好的，没问题，大家都过来吧！站到我面前，让我来为大家拍一张大合照！")
             arm_req = StringServiceRequest()
-            arm_req.request = '7'
+            arm_req.request = 7
             # self.arm_client.wait_for_service()
             Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
             
@@ -507,8 +514,13 @@ class SocketDemo(Thread):
 
         # 状态2: 最终段落
         elif status_value == 2:
-            if self.seen_status_0 or self.detected_intent == "WHATTIME":
+            if self.seen_status_0:
                 self.sentence_buffer.append_text(text_value)
+            elif self.detected_intent == "WHATTIME" or self.openQA:
+                self.flush_all()
+                self.sentence_buffer.append_text(text_value)
+                self.openQA = False
+        
             
             
             if self.intent_state == True:
@@ -557,11 +569,17 @@ class SocketDemo(Thread):
             rospy.logerr("解析后的数据不是字典格式")
             return
         try:
+            if parsed_data.get("answer", {}).get("answerType") == "openQA":
+                self.openQA = True
+                rospy.loginfo("开启开放式问答模式")
+        except (IndexError, AttributeError, TypeError, KeyError) as e:
+            rospy.loginfo(f"非开放式问答: {str(e)}")
+        try:
             self.vlm_text = parsed_data.get('semantic', {})[0].get('template', "")
             rospy.loginfo(f"技能 VLM / VLA 文本: {self.vlm_text} ")
         except (IndexError, AttributeError, TypeError, KeyError) as e:
             self.vlm_text = ""
-            rospy.logerr(f"语义 VLM / VLA解析小异常: {str(e)}")
+            rospy.logwarn(f"语义 VLM / VLA解析小异常: {str(e)}")
         try:
             self.detected_intent = parsed_data.get('semantic', {})[0].get('intent', {})
 

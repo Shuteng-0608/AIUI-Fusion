@@ -131,7 +131,7 @@ def download_and_play_tts(url):
         # playsound(temp_file)
         play_audio(temp_file)
         # 删除临时文件（可选）
-        os.remove(temp_file)
+        # os.remove(temp_file)
         
     except Exception as e:
         rospy.logerr(f"下载或播放音频时出错: {e}")
@@ -180,6 +180,7 @@ def handle_tts_request(req):
             "vcn": "x4_lingfeizhe_oral",
             "speed": "50",
             "volume": "100",
+            "pitch": "50",
             "scene": "IFLYTEK.tts",
             "tts_res_type": "url",
             "context": "{{\\\"sdk_support\\\":[\\\"tts\\\"]}}"
@@ -215,10 +216,10 @@ def handle_tts_request(req):
 
 if __name__ == "__main__":
     # 2.初始化 ROS 节点
-    rospy.init_node("aiui_tts_server_node")
+    rospy.init_node("aiui_tts_player_server_node")
     # 3.创建服务对象
-    server = rospy.Service("tts_service", TTS, handle_tts_request)
-    rospy.loginfo("AIUI TTS service is ready.")
+    server = rospy.Service("/tts_service/player", TTS, handle_tts_request)
+    rospy.loginfo("AIUI TTS Player service is ready.")
     # 4.回调函数处理请求并产生响应
     # 5.spin 函数
     rospy.spin()

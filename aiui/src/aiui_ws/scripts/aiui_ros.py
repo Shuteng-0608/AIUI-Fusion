@@ -68,7 +68,7 @@ class SocketDemo(Thread):
         self.wakeup_state = False
         self.arm_client = rospy.ServiceProxy("aris_node/cmd_str_srv",StringService)
         self.vlm_client = rospy.ServiceProxy("vlm_service",VLMProcess)
-        self.tts_client = rospy.ServiceProxy("tts_service",TTS)
+        self.tts_client = rospy.ServiceProxy("/tts_service/player",TTS)
         self.dh5_client = rospy.ServiceProxy("/dh5/set_all_position",DH5SetPosition)
         self.vla_client = rospy.ServiceProxy("vla_service", VLAProcess)
         self.pending_response = []  # 暂存中间段(状态1)的文本
