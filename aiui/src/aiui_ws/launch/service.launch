@@ -1,9 +1,19 @@
 <launch>
-    <!-- 启动 TTS 节点 -->
+    <!-- 启动 TTS PLAYER 节点 -->
+
     <node 
         pkg="aiui" 
-        type="aiui_tts_service_node.py" 
-        name="aiui_tts_service_node" 
+        type="tts_test.py" 
+        name="tts_player_service_node" 
+        output="screen"
+    />
+
+    <!-- 启动 TTS GENERATOR 节点 -->
+
+    <node 
+        pkg="aiui" 
+        type="tts_test.py" 
+        name="tts_generator_service_node" 
         output="screen"
     />
 
@@ -35,8 +45,15 @@
     />
     
     <!-- 启动 OrbbecSDK_ROS1 节点 -->
-    <!-- <include file="$(find orbbec_camera)/launch/gemini_330_series.launch" /> -->
-    <!-- <include file="$(find OrbbecSDK_ROS1)/launch/gemini_330_series.launch" /> -->
-    <!-- <include file="/home/whc/camera_ws/src/OrbbecSDK_ROS1/launch/gemini_330_series.launch" /> -->
+    <include file="$(find orbbec_camera)/launch/gemini_330_series.launch"/>
+
+    <!-- 启动 AIUI 主入口结点 -->
+    <node 
+        pkg="aiui" 
+        type="aiui_test01.py"
+        name="aiui_test01" 
+        launch-prefix="bash -c 'source /opt/ros/$ROS_DISTRO/setup.bash &amp;&amp; source $HOME/aiui_ws/devel/setup.bash &amp;&amp; terminator -T &quot;AIUI MAIN Node&quot; --geometry=1000x600+500+100 -e &quot;export ROS_MASTER_URI=http://localhost:8888; export ROS_HOSTNAME=localhost; source /opt/ros/$ROS_DISTRO/setup.bash &amp;&amp; source $HOME/aiui_ws/devel/setup.bash &amp;&amp; rosrun aiui aiui_test01.py; echo; read -p \&quot;Press Enter to close...\&quot;&quot;'"
+        output="log"
+    />
     
 </launch>
