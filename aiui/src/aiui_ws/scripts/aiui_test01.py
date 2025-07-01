@@ -12,6 +12,7 @@ import numpy as np
 import pygame
 import pygame.mixer
 import os
+import random
 
 import rospy
 from aiui.srv import TTS, TTSRequest
@@ -19,6 +20,7 @@ from aiui.srv import VLMProcess, VLMProcessRequest
 from aiui.srv import StringService, StringServiceRequest
 from aiui.srv import DH5SetPosition, DH5SetPositionRequest
 from aiui.srv import VLAProcess, VLAProcessRequest
+from aiui.srv import CheckRunStatus, CheckRunStatusRequest
 from std_msgs.msg import String
 import cv2
 from cv_bridge import CvBridge
@@ -57,6 +59,7 @@ class SocketDemo(Thread):
         self.tts_client = rospy.ServiceProxy("/tts_service/generator",TTS)
         self.dh5_client = rospy.ServiceProxy("/dh5/set_all_position",DH5SetPosition)
         self.vla_client = rospy.ServiceProxy("vla_service", VLAProcess)
+        self.check_client = rospy.ServiceProxy("/aris_node/check_srv", CheckRunStatus)
 
         self.seen_status_0 = False  # 标记是否见过状态0
         self.intent_state = False  # intent状态标志
@@ -391,7 +394,9 @@ class SocketDemo(Thread):
             req = StringServiceRequest()
             req.request = 3
             # self.arm_client.wait_for_service()
-            Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
+            resp = self.check_client.call(CheckRunStatusRequest())
+            if resp.ros_run_flag is False:
+                Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
 
         elif intent == "handshake":
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行握手动作")
@@ -399,7 +404,9 @@ class SocketDemo(Thread):
             req = StringServiceRequest()
             req.request = 4 # TODO
             # self.arm_client.wait_for_service()
-            Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
+            resp = self.check_client.call(CheckRunStatusRequest())
+            if resp.ros_run_flag is False:
+                Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
 
         elif intent == "LabTour":
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行实验室游览动作")
@@ -414,7 +421,9 @@ class SocketDemo(Thread):
             req = StringServiceRequest()
             req.request = 5 # TODO
             # self.arm_client.wait_for_service()
-            Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
+            resp = self.check_client.call(CheckRunStatusRequest())
+            if resp.ros_run_flag is False:
+                Thread(target=self.arm_client.call, args=(req,), daemon=True).start()
 
  
         elif intent == "Nod":
@@ -437,9 +446,11 @@ class SocketDemo(Thread):
             self.sentence_buffer.append_text("好的，没问题！")
 
             vla_req = VLAProcessRequest()
-            vla_req.prompt = self.vlm_text
+            vla_req.prompt = self.vla_text
             # self.vla_client.wait_for_service()
-            Thread(target=self.vla_client.call, args=(vla_req,), daemon=True).start()
+            resp = self.check_client.call(CheckRunStatusRequest())
+            if resp.ros_run_flag is False:
+                Thread(target=self.vla_client.call, args=(vla_req,), daemon=True).start()
         
         elif intent == "vlm":
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行描述动作")
@@ -458,9 +469,12 @@ class SocketDemo(Thread):
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行自拍动作")
             self.sentence_buffer.append_text("好的，摆个点赞的姿势，来和我自拍一张吧")
             arm_req = StringServiceRequest()
-            arm_req.request = 6
+            arm_req.request = random.choice([6, 9, 10])
+            # arm_req.request = 6
             # self.arm_client.wait_for_service()
-            Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
+            resp = self.check_client.call(CheckRunStatusRequest())
+            if resp.ros_run_flag is False:
+                Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
 
         elif intent == "pangu":
             self.intent_state = True
@@ -475,9 +489,30 @@ class SocketDemo(Thread):
             arm_req = StringServiceRequest()
             arm_req.request = 7
             # self.arm_client.wait_for_service()
-            Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
-            
-            self.thake_photo()
+            resp = self.check_client.call(CheckRunStatusRequest())
+            if resp.ros_run_flag is False:
+                Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
+                self.thake_photo()
+        elif intent == "LOVE":
+            rospy.loginfo(f"检测到 [{intent}] 意图, 执行比心动作")
+            self.sentence_buffer.append_text("南科大爱你呦！啾咪啾咪！")
+            arm_req = StringServiceRequest()
+            arm_req.request = random.choice([12, 13])
+            # self.arm_client.wait_for_service()
+            resp = self.check_client.call(CheckRunStatusRequest())
+            if resp.ros_run_flag is False:
+                Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
+        elif intent == "handclap":
+            rospy.loginfo(f"检测到 [{intent}] 意图, 执行鼓掌动作")
+            self.sentence_buffer.append_text("来大家一起鼓掌！精彩！精彩！！")
+            arm_req = StringServiceRequest()
+            arm_req.request = 8 # TODO
+            # self.arm_client.wait_for_service()
+            resp = self.check_client.call(CheckRunStatusRequest())
+            if resp.ros_run_flag is False:
+                Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
+
+
 
             
     # 替换原有的play_audio函数
@@ -574,12 +609,7 @@ class SocketDemo(Thread):
                 rospy.loginfo("开启开放式问答模式")
         except (IndexError, AttributeError, TypeError, KeyError) as e:
             rospy.loginfo(f"非开放式问答: {str(e)}")
-        try:
-            self.vlm_text = parsed_data.get('semantic', {})[0].get('template', "")
-            rospy.loginfo(f"技能 VLM / VLA 文本: {self.vlm_text} ")
-        except (IndexError, AttributeError, TypeError, KeyError) as e:
-            self.vlm_text = ""
-            rospy.logwarn(f"语义 VLM / VLA解析小异常: {str(e)}")
+        
         try:
             self.detected_intent = parsed_data.get('semantic', {})[0].get('intent', {})
 
@@ -588,7 +618,24 @@ class SocketDemo(Thread):
             rospy.logwarn(f"无意图: {str(e)}")
         if self.detected_intent:
             rospy.loginfo(f"成功提取意图: {self.detected_intent}")
-            if self.detected_intent in ["SayHi", "handshake", "LabTour", "Bow", "Nod", "vla", "vlm", "self_photo", "pangu", "take_photo"]:
+            if self.detected_intent == "vla":
+                try:
+                    self.vla_text = parsed_data.get('text', "")
+                    rospy.loginfo(f"技能 VLA 文本: {self.vla_text} ")
+                except (IndexError, AttributeError, TypeError, KeyError) as e:
+                    self.vla_text = ""
+                    rospy.logwarn(f"语义 VLA 解析小异常: {str(e)}")
+            
+            if self.detected_intent == "vlm":
+                try:
+                    self.vlm_text = parsed_data.get('semantic', {})[0].get('template', "")
+                    rospy.loginfo(f"技能 VLM 文本: {self.vlm_text} ")
+                
+                except (IndexError, AttributeError, TypeError, KeyError) as e:
+                    self.vlm_text = ""
+                    rospy.logwarn(f"语义 VLM 解析小异常: {str(e)}")
+
+            if self.detected_intent in ["SayHi", "handshake", "LabTour", "Bow", "Nod", "vla", "vlm", "self_photo", "pangu", "take_photo", "LOVE"]:
                 self.flush_all()  # 清空之前的缓冲区
                 self.handle_detected_intent(self.detected_intent)
         else:
