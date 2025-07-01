@@ -33,7 +33,7 @@ class VLAServiceServer:
             'fx': 613.6777954101562,
             'fy': 613.6703491210938
         }
-        self.tts_client = rospy.ServiceProxy('tts_service', TTS)
+        self.tts_client = rospy.ServiceProxy('/tts_service/player', TTS)
         rospy.loginfo("VLA Service Server is ready")
         """
         K: [613.6777954101562, 0.0,                 640.4387817382812, 
@@ -262,7 +262,12 @@ class VLAServiceServer:
                     traj_req.target_pq[6] = z
                     # ik_req.action = act
                     arm_client.wait_for_service()
-                    ik_response = arm_client.call(traj_req)
+                    try:
+                        ik_response = arm_client.call(traj_req)
+                        rospy.loginfo(f"IK Response: {ik_response}")
+                    except rospy.ServiceException as e:
+                        rospy.logerr(f"Service call failed: {e}")
+                        return VLAProcessResponse(f"Service call failed: {e}")
                     
                 except:
                     # parsed_result = str(result)

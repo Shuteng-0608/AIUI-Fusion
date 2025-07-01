@@ -390,7 +390,7 @@ class SocketDemo(Thread):
         
         if intent == "SayHi":
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行打招呼动作")
-            self.sentence_buffer.append_text("你好呀，欢迎您来到南方科技大学机器人研究院，很高兴见到您！")
+            self.sentence_buffer.append_text("你好呀，很高兴见到您！")
             req = StringServiceRequest()
             req.request = 3
             # self.arm_client.wait_for_service()
@@ -551,6 +551,7 @@ class SocketDemo(Thread):
         elif status_value == 2:
             if self.seen_status_0:
                 self.sentence_buffer.append_text(text_value)
+                self.seen_status_0 = False  # 重置状态标志
             elif self.detected_intent == "WHATTIME" or self.openQA:
                 self.flush_all()
                 self.sentence_buffer.append_text(text_value)
