@@ -65,6 +65,7 @@ add_service_files(
   DH5SetPosition.srv
   IkOptService.srv
   TrajectoryService.srv
+  CheckRunStatus.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -177,6 +178,8 @@ catkin_install_python(PROGRAMS
   scripts/aiui_test01.py
   scripts/tts_test.py
   scripts/keyboard_action.py
+  scripts/keyboard_demo.py
+  scripts/roscore_monitor.py
   # hand_eye_calibration/hand_eye_calibration.py
   hand_eye_calibration/collect_data_ros.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
