@@ -102,6 +102,10 @@ class ExtendedKeyboardActionNode:
             ("0", "🚪 退出程序"),
             ("e", "🔋 使能(enable)"),
             ("d", "💀 掉电(disable)"),
+            ("o", "打开夹爪"),
+            ("c", "关闭夹爪"),
+            ("w", "手部动作(ONE)"),
+            ("r", "手部动作(ROCK)"),
         ]
         
         # 计算每列需要显示的数量（三列）
@@ -136,7 +140,7 @@ class ExtendedKeyboardActionNode:
             tts_req = TTSRequest()
             tts_req.request = "你好呀，欢迎您来到南方科技大学机器人研究院，很高兴见到您！"
             # self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
             req = StringServiceRequest()
             req.request = 3
             # self.arm_client.wait_for_service()
@@ -147,7 +151,7 @@ class ExtendedKeyboardActionNode:
             tts_req = TTSRequest()
             tts_req.request = "好呀，和我握个手吧，很高兴认识你，我还想再多和你交流交流呢！"
             # self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
             req = StringServiceRequest()
             req.request = 4 # TODO
             # self.arm_client.wait_for_service()
@@ -157,7 +161,7 @@ class ExtendedKeyboardActionNode:
             tts_req = TTSRequest()
             tts_req.request = "哇时间过得好快, 再见喽，期待下次再和您见面，记得要常来看我哦！"
             # self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
             req = StringServiceRequest()
             req.request = 5 # TODO
             # self.arm_client.wait_for_service()
@@ -169,7 +173,7 @@ class ExtendedKeyboardActionNode:
             tts_req = TTSRequest()
             tts_req.request = "我叫南科盘古，我是南方科技大学机器人研究院研发的第一款人形机器人，我可以做一些简单的交互动作，还可以陪你闲聊散心, 另外我还是实验室的科研小助手，想知道今天的天气也可以问我哦！"
             # self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
             
             # req = StringServiceRequest()
             # req.request = '2' # TODO
@@ -182,7 +186,7 @@ class ExtendedKeyboardActionNode:
             tts_req = TTSRequest()
             tts_req.request = "好的，请稍等片刻"
             # self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
 
             vla_req = VLAProcessRequest()
             vla_req.prompt = "帮我拿一下这个瓶子"
@@ -194,7 +198,7 @@ class ExtendedKeyboardActionNode:
             tts_req = TTSRequest()
             tts_req.request = "好的，让我仔细看一下！"
             # self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
 
             vlm_req = VLMProcessRequest()
             vlm_req.prompt = "请描述一下看到了什么"
@@ -209,7 +213,7 @@ class ExtendedKeyboardActionNode:
             tts_req = TTSRequest()
             tts_req.request = "好的，摆个点赞的姿势，来和我自拍一张吧"
             # self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
             arm_req = StringServiceRequest()
             arm_req.request = random.choice([6, 9, 10])
             # self.arm_client.wait_for_service()
@@ -221,7 +225,7 @@ class ExtendedKeyboardActionNode:
             tts_req = TTSRequest()
             tts_req.request = "好的，盘古是中国古代传说时期中开天辟地的神。在很久很久以前，宇宙混沌一团，盘古凭借着自己的神力把天地开辟出来了。"
             # self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
             
         elif intent == "take_photo":
             self.intent_state = True
@@ -229,19 +233,19 @@ class ExtendedKeyboardActionNode:
             tts_req = TTSRequest()
             tts_req.request = "好的，没问题，大家都过来吧！站  到我面前，让我来为大家拍一张大合照！"
             # self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
             arm_req = StringServiceRequest()
             arm_req.request = 7
             # self.arm_client.wait_for_service()
             Thread(target=self.arm_client.call, args=(arm_req,), daemon=True).start()
             
-            self.thake_photo()
+            # self.thake_photo()
         elif intent == "LOVE":
             rospy.loginfo(f"检测到 [{intent}] 意图, 执行比心动作")
             tts_req = TTSRequest()
             tts_req.request = "南科大爱你呦！啾咪啾咪！"
             # self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
             arm_req = StringServiceRequest()
             arm_req.request = random.choice([12, 13])
             # self.arm_client.wait_for_service()
@@ -252,7 +256,7 @@ class ExtendedKeyboardActionNode:
             tts_req = TTSRequest()
             tts_req.request = "精彩精彩！大家一起鼓掌！太棒了！"
             # self.tts_client.wait_for_service()
-            Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
+            # Thread(target=self.tts_client.call, args=(tts_req,), daemon=True).start()
             arm_req = StringServiceRequest()
             arm_req.request = 8
             # self.arm_client.wait_for_service()
@@ -346,9 +350,42 @@ class ExtendedKeyboardActionNode:
         elif key_char == 'm':       self.handle_detected_intent("vlm")
         elif key_char == 'e':       
             req = StringServiceRequest()
-            req.request = 2  # 鼓掌动作
+            req.request = 2  #
             self.sys_client.wait_for_service()
             self.sys_client.call(req)
+        elif key_char == 'w':
+            dh5_req = DH5SetPositionRequest()
+            # [930, 1770, 1707, 1730, 1730, 980]
+            dh5_req.hand_type = 'right'
+            dh5_req.hand_mode = 'hand'
+            dh5_req.right_position_list = [30, 1770, 30, 30, 30, 825]
+            self.dh5_client.wait_for_service()
+            self.dh5_client.call(dh5_req)
+        elif key_char == 'r':
+            dh5_req = DH5SetPositionRequest()
+            # [930, 1770, 1707, 1730, 1730, 980]
+            dh5_req.hand_type = 'right'
+            dh5_req.hand_mode = 'hand'
+            dh5_req.right_position_list = [930, 1770, 30, 30, 1730, 980]
+            self.dh5_client.wait_for_service()
+            self.dh5_client.call(dh5_req)
+
+        elif key_char == 'o':
+            dh5_req = DH5SetPositionRequest()
+            # [930, 1770, 1707, 1730, 1730, 980]
+            dh5_req.hand_type = 'right'
+            dh5_req.hand_mode = 'gripper'
+            dh5_req.gripper_state = 'open'
+            self.dh5_client.wait_for_service()
+            self.dh5_client.call(dh5_req)
+        elif key_char == 'c':
+            dh5_req = DH5SetPositionRequest()
+            # [930, 1770, 1707, 1730, 1730, 980]
+            dh5_req.hand_type = 'right'
+            dh5_req.hand_mode = 'gripper'
+            dh5_req.gripper_state = 'close'
+            self.dh5_client.wait_for_service()
+            self.dh5_client.call(dh5_req)
         elif key_char == 'd':
             req = StringServiceRequest()
             req.request = 3

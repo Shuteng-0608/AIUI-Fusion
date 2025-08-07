@@ -552,7 +552,7 @@ class SocketDemo(Thread):
             if self.seen_status_0:
                 self.sentence_buffer.append_text(text_value)
                 self.seen_status_0 = False  # 重置状态标志
-            elif self.detected_intent == "WHATTIME" or self.openQA:
+            elif self.detected_intent == "WHATTIME" or self.openQA or self.intent_state == True:
                 self.flush_all()
                 self.sentence_buffer.append_text(text_value)
                 self.openQA = False
@@ -619,6 +619,7 @@ class SocketDemo(Thread):
             rospy.logwarn(f"无意图: {str(e)}")
         if self.detected_intent:
             rospy.loginfo(f"成功提取意图: {self.detected_intent}")
+            self.intent_state = True  # 重置意图状态
             if self.detected_intent == "vla":
                 try:
                     self.vla_text = parsed_data.get('text', "")
