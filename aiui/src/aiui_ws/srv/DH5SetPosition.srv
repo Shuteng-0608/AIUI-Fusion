@@ -1,4 +1,4 @@
-string hand_type        # 'right' or 'left'
+string hand_type        # 'right' or 'left' or 'both'
 string hand_mode        # 'hand' or 'gripper'
 string gripper_state    # 'open' or 'close'
 
